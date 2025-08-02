@@ -18,14 +18,13 @@ class PPOClip:
         actor_lr (float): Actor learning rate
         critic_lr (float): Critic learning rate
         update_epochs (int): Number of update epochs
-        threshold_rollout_length (int): Minimum rollout length
         device (str): Device to use ('cpu' or 'cuda')
 
     """
 
     def __init__(self, state_dim, action_dim, clip_range=0.2, max_kl=0.01,
                  gamma=0.99, gae_lambda=0.95, actor_lr=3e-4, critic_lr=3e-4,
-                 update_epochs=10, threshold_rollout_length=2048, device='cpu'):
+                 update_epochs=10, device='cpu'):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.clip_range = clip_range
@@ -33,7 +32,6 @@ class PPOClip:
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.update_epochs = update_epochs
-        self.threshold_rollout_length = threshold_rollout_length
         self.device = device
 
         # Networks
