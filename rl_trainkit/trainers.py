@@ -23,7 +23,7 @@ class OnPolicyTrainer:
 
     def __init__(self, environment, agent, total_timesteps=1_000_000,
                  threshold_rollout_length=2048, max_episode_len=1000,
-                 device='cpu', batch_size=64,
+                 batch_size=64,
                  num_checkpoints=3,
                  batch_num=None, verbose=True):
         self.env = environment
@@ -31,7 +31,6 @@ class OnPolicyTrainer:
         self.total_timesteps = total_timesteps
         self.threshold_rollout_length = threshold_rollout_length
         self.max_episode_len = max_episode_len
-        self.device = device
         self.batch_size = batch_size
         self.batch_num = batch_num
 
