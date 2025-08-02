@@ -22,7 +22,6 @@ def main():
         actor_lr=3e-4,
         critic_lr=3e-4,
         update_epochs=10,
-        threshold_rollout_length=2048,
         device = "cuda" if torch.cuda.is_available() else "cpu"
     )
 
@@ -30,7 +29,7 @@ def main():
     trainer = OnPolicyTrainer(
         environment=env,
         agent=agent,
-        total_timesteps=3_000_000,
+        total_timesteps=300_000,
         threshold_rollout_length=2048,
         max_episode_len=200,
         batch_size=64,
