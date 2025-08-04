@@ -126,7 +126,7 @@ class OnPolicyTrainer:
                 rollout_buffer.concat(trajectory)
 
             # Update networks
-            self.agent.update(rollout_buffer, self.logger)
+            self.agent.update_with_rollout(rollout_buffer, self.logger)
 
             # Print log
             self.logger.total_rollouts += 1
