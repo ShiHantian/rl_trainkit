@@ -14,7 +14,30 @@ rl_trainkit/
 └── utils.py        # utility functions (e.g., logging, visualization)
 ```
 
-### Buffers
+### PPOClip (in `ppo_agent.py`)
+
+#### Update after a rollout
+
+```python
+for epoch in num_update_epochs:
+  for batch in batchs_from_shuffled_rollout_buffer:
+    update_with_the_batch
+```
+
+#### Update with a batch
+
+- move the batch to device
+- calculate log_probabilities and values for the steps in the batch, with current policy and value networks
+- loss for updating actor network:
+  - calculate the `clipped_ratio`, which is the core of PPO-clip algorithm
+  - calculate critic_loss
+- loss for updating critic network:
+  - calculate the `value_pred_clipped`,
+  - calculate the `value_loss_unclipped` and `value_loss_clipped`
+  - take the maximum of the two value losses
+- backpropagation, update actor and critic networks
+
+### Buffers (in `buffers.py`)
 
 <p align="center">
     <img src="assets/base_buffer_dimension.png" align="center" alt="base_buffer_dimension" width="60%"/>
