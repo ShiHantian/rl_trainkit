@@ -65,8 +65,8 @@ def main():
 
     # Load trained models
     try:
-        agent.load_policy_net('pendulum_actor.pth')
-        agent.load_value_net('pendulum_critic.pth')
+        agent.load_policy_net('models/final_actor.pth')
+        agent.load_value_net('models/final_critic.pth')
         print("Models loaded successfully!")
     except FileNotFoundError:
         print("Error: Model files not found. Please run train_Pendulum_example.py first.")
