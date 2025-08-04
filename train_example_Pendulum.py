@@ -17,6 +17,7 @@ def main():
         state_dim=state_dim,
         action_dim=action_dim,
         clip_range=0.2,
+        value_clip_range=0.1,
         gamma=0.99,
         gae_lambda=0.95,
         actor_lr=3e-4,

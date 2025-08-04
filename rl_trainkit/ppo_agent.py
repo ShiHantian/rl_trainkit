@@ -12,6 +12,7 @@ class PPOClip:
         state_dim (int): State dimension
         action_dim (int): Action dimension
         clip_range (float): PPO clip range
+        value_clip_range (float): Value clip range
         max_kl (float): Maximum KL divergence
         gamma (float): Discount factor
         gae_lambda (float): GAE lambda parameter
@@ -22,12 +23,13 @@ class PPOClip:
 
     """
 
-    def __init__(self, state_dim, action_dim, clip_range=0.2, max_kl=0.01,
+    def __init__(self, state_dim, action_dim, clip_range=0.2, value_clip_range=0.2, max_kl=0.01,
                  gamma=0.99, gae_lambda=0.95, actor_lr=3e-4, critic_lr=3e-4,
                  update_epochs=10, device='cpu'):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.clip_range = clip_range
+        self.value_clip_range = value_clip_range
         self.max_kl = max_kl
         self.gamma = gamma
         self.gae_lambda = gae_lambda
@@ -130,13 +132,12 @@ class PPOClip:
                 # Actor loss
                 actor_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
 
-                # Critic loss (value function clipping)
-                value_pred_clipped = old_values + torch.clamp(
-                    values - old_values, -self.clip_range, self.clip_range
-                )
-                value_loss1 = (values - returns).pow(2)
-                value_loss2 = (value_pred_clipped - returns).pow(2)
-                critic_loss = 0.5 * torch.max(value_loss1, value_loss2).mean()
+                # Critic loss (clipped value objective)
+                value_pred_clipped = old_values + \
+                    torch.clamp(values - old_values, -self.value_clip_range, self.value_clip_range)
+                value_loss_unclipped = (values - returns).pow(2)
+                value_loss_clipped = (value_pred_clipped - returns).pow(2)
+                critic_loss = 0.5 * torch.max(value_loss_unclipped, value_loss_clipped).mean()
 
                 # Update actor
                 self.actor_optimizer.zero_grad()
