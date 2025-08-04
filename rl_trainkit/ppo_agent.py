@@ -13,7 +13,7 @@ class PPOClip:
         action_dim (int): Action dimension
         clip_range (float): PPO clip range
         value_clip_range (float): Value clip range
-        max_kl (float): Maximum KL divergence
+        target_kl (float): Maximum KL divergence
         gamma (float): Discount factor
         gae_lambda (float): GAE lambda parameter
         actor_lr (float): Actor learning rate
@@ -23,14 +23,14 @@ class PPOClip:
 
     """
 
-    def __init__(self, state_dim, action_dim, clip_range=0.2, value_clip_range=0.2, max_kl=0.01,
+    def __init__(self, state_dim, action_dim, clip_range=0.2, value_clip_range=0.2, target_kl=0.01,
                  gamma=0.99, gae_lambda=0.95, actor_lr=3e-4, critic_lr=3e-4,
                  update_epochs=10, device='cpu'):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.clip_range = clip_range
         self.value_clip_range = value_clip_range
-        self.max_kl = max_kl
+        self.target_kl = target_kl
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.update_epochs = update_epochs
@@ -113,7 +113,9 @@ class PPOClip:
         """
         for epoch in range(self.update_epochs):
             for batch in rollout_buffer.get_batches():
-                self.update_with_batch(batch, logger)
+                early_stop = self.update_with_batch(batch, logger)
+                if early_stop:
+                    return
 
     def update_with_batch(self, batch, logger=None):
         """Update actor and critic networks with the rollout buffer.
@@ -165,6 +167,13 @@ class PPOClip:
                 approx_kl = (old_log_probs - log_probs).mean().item()
                 clipped = (clipped_ratio != ratio).float().mean().item()
                 logger.log_update(clipped, approx_kl)
+
+        # Check for early stop for too big KL divergence
+        early_stop = False
+        if approx_kl > 1.5 * self.target_kl:
+            early_stop = True
+
+        return early_stop
 
     def save_policy_net(self, path):
         """Save policy network.
