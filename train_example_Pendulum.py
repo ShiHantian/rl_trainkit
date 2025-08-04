@@ -39,12 +39,6 @@ def main():
     # Train the agent
     trainer.train()
 
-    # Save the trained models
-    os.makedirs("models", exist_ok=True)
-    agent.save_policy_net("models/final_actor.pth")
-    agent.save_value_net("models/final_critic.pth")
-    print("Models saved!")
-
     env.close()
 
 
