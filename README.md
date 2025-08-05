@@ -20,7 +20,7 @@ In the training script, add the following import statement:
 from rl_trainkit import PPOClip, OnPolicyTrainer
 ```
 
-Detailed usage and project structure explanation, see [Doc](documentation/Doc.md)
+Detailed usage and project structure explanation, see [documentation](docs/Doc.md)
 
 Training script example: refer to [train_example_Pendulum.py](train_example_Pendulum.py)
 
