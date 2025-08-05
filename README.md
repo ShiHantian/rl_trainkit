@@ -5,11 +5,13 @@ Implementations of Reinforcement learning algorithms in PyTorch.
 - Support only **PPO-clip** for now
 - Support only **vector observation**, **continues action** for now
 
-## Requirements
+## Quick start
+
+### Requirements
 
 > gymnasium torch numpy tqdm
 
-## Quick start
+### Import as package
 
 Place the `rl_trainkit` folder from the repository in the same directory as the training script.
 In the training script, add the following import statement:
@@ -18,7 +20,7 @@ In the training script, add the following import statement:
 from rl_trainkit import PPOClip, OnPolicyTrainer
 ```
 
-Detailed usage and code structure explanation, see [Doc](docs/Doc.md)
+Detailed usage and project structure explanation, see [Doc](documentation/Doc.md)
 
 Training script example: refer to [train_example_Pendulum.py](train_example_Pendulum.py)
 
