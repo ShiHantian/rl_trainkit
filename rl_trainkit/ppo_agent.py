@@ -162,11 +162,10 @@ class PPOClip:
         self.critic_optimizer.step()
 
         # Log statistics
-        if logger is not None:
-            with torch.no_grad():
-                approx_kl = (old_log_probs - log_probs).mean().item()
-                clipped = (clipped_ratio != ratio).float().mean().item()
-                logger.log_update(clipped, approx_kl)
+        with torch.no_grad():
+            approx_kl = (old_log_probs - log_probs).mean().item()
+            clipped = (clipped_ratio != ratio).float().mean().item()
+            logger.log_update(clipped, approx_kl)
 
         # Check for early stop for too big KL divergence
         early_stop = False

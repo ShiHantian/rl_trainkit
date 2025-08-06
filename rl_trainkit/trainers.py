@@ -2,7 +2,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 from .buffers import RolloutBuffer
-from .utils import Logger
+from .utils import Logger, Visualizer
 
 
 class OnPolicyTrainer:
@@ -10,11 +10,10 @@ class OnPolicyTrainer:
 
     Args:
         environment: Gymnasium environment
-        agent: PPO agent
+        agent: PPO agent by default for now
         total_timesteps (int): Total training timesteps
         threshold_rollout_length (int): Minimum rollout length
         max_episode_len (int): Maximum episode length
-        device (str): Device to use ('cpu' or 'cuda')
         batch_size (int): Batch size for training
         batch_num (int): Number of batches (if None, use batch_size)
         verbose (bool): Whether to print logs
@@ -22,9 +21,10 @@ class OnPolicyTrainer:
     """
 
     def __init__(self, environment, agent, total_timesteps=1_000_000,
-                 threshold_rollout_length=2048, max_episode_len=1000,
+                 threshold_rollout_length=2048, max_episode_len=1024,
                  batch_size=64,
                  num_checkpoints=3,
+                 mini_ckpt_period=None,
                  batch_num=None, verbose=True):
         self.env = environment
         self.agent = agent
@@ -34,8 +34,14 @@ class OnPolicyTrainer:
         self.batch_size = batch_size
         self.batch_num = batch_num
 
-        # Logger
+        # Logger and Visualizer
         self.logger = Logger(verbose=verbose)
+        self.visualizer = Visualizer(self.logger)
+        if mini_ckpt_period is not None:
+            self.mini_ckpt_period = mini_ckpt_period
+        elif mini_ckpt_period is None:
+            self.mini_ckpt_period = total_timesteps / 10
+        self._last_mini_ckpt = 0
 
         # Progress bar
         self.pbar = tqdm(total=total_timesteps, desc="Training Progress")
@@ -149,6 +155,11 @@ class OnPolicyTrainer:
                     best_path = os.path.join("models", "best_return_pi_ckpt.pth")
                     self.agent.save_policy_net(best_path)
 
+            # === visualization and mini-checkpoints
+            if self.logger.total_timesteps >= (self._last_mini_ckpt + self.mini_ckpt_period):
+                self.visualizer.plot_ckpt(self.logger.total_timesteps)
+                self._last_mini_ckpt += self.mini_ckpt_period
+
             # Clear buffers
             rollout_buffer.clear()
 
@@ -159,6 +170,9 @@ class OnPolicyTrainer:
         self.agent.save_policy_net(final_actor_path)
         self.agent.save_value_net(final_critic_path)
         print("Final models saved!")
+
+        # Generate the plot for complete training
+        self.visualizer.plot_ckpt(self.logger.total_timesteps)
 
         # Close progress bar
         self.pbar.close()

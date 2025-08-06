@@ -9,7 +9,7 @@ Implementations of Reinforcement learning algorithms in PyTorch.
 
 ### Requirements
 
-> gymnasium torch numpy tqdm
+> gymnasium torch numpy tqdm matplotlib
 
 ### Import as package
 

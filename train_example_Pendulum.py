@@ -34,6 +34,8 @@ def main():
         threshold_rollout_length=2048,
         max_episode_len=200,
         batch_size=64,
+        num_checkpoints=4,
+        mini_ckpt_period=4096,
         verbose=True
     )
 
