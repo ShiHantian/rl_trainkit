@@ -78,10 +78,10 @@ class Logger:
         """Log step statistics."""
         self.rollout_rewards.append(reward)
 
-    def log_update(self, clipped_ratio, kl):
+    def log_update(self, clipped_ratio, approx_kl):
         """Log update statistics."""
         self.rollout_clipped_ratios.append(clipped_ratio)
-        self.rollout_kls.append(kl)
+        self.rollout_kls.append(approx_kl)
 
     def print_log(self, total_timesteps_target, clip_range):
         """Print training log and snapshot rollout stats for plotting."""

@@ -16,7 +16,11 @@ def main():
     agent = PPOClip(
         state_dim=state_dim,
         action_dim=action_dim,
+        use_shared_network=True,
+        feature_extractor_type='mlp',
         clip_range=0.2,
+        value_coef=0.5,
+        entropy_coef=0.01,
         gamma=0.99,
         gae_lambda=0.95,
         actor_lr=3e-4,

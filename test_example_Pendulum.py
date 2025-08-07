@@ -65,7 +65,7 @@ def main():
 
     # Load trained models
     try:
-        agent.load_policy_net('models/best_return_pi_ckpt')
+        agent.load_policy_net('models/final_actor.pth')
         # agent.load_value_net('pendulum_critic.pth')
         print("Models loaded successfully!")
     except FileNotFoundError:
