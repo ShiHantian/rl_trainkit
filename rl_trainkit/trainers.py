@@ -23,7 +23,7 @@ class OnPolicyTrainer:
 
     def __init__(self, environment, agent, total_timesteps=1_000_000,
                  threshold_rollout_length=2048, max_episode_len=1000,
-                 device='cpu', batch_size=64,
+                 batch_size=64,
                  num_checkpoints=3,
                  batch_num=None, verbose=True):
         self.env = environment
@@ -31,7 +31,6 @@ class OnPolicyTrainer:
         self.total_timesteps = total_timesteps
         self.threshold_rollout_length = threshold_rollout_length
         self.max_episode_len = max_episode_len
-        self.device = device
         self.batch_size = batch_size
         self.batch_num = batch_num
 
@@ -44,8 +43,8 @@ class OnPolicyTrainer:
         # Checkpoint logic
         os.makedirs("models", exist_ok=True)
         self.num_checkpoints = num_checkpoints
-        # Milestones are at i/(num_checkpoints+1) ratio of total timesteps
-        self.checkpoint_milestones = [
+        # Checkpoint timesteps are at i/(num_checkpoints+1) ratio of total timesteps
+        self.checkpoint_timesteps = [
             total_timesteps * i / (self.num_checkpoints + 1)
             for i in range(1, self.num_checkpoints + 1)
         ]
@@ -135,9 +134,9 @@ class OnPolicyTrainer:
 
             # === checkpoint and best model saving ===
             # 1. Checkpoint saves at checkpoint milestones
-            for idx, milestone in enumerate(self.checkpoint_milestones):
+            for idx, milestone in enumerate(self.checkpoint_timesteps):
                 if (not self.checkpoints_saved[idx]) and (self.logger.total_timesteps >= milestone):
-                    ckpt_name = f"pi_ckpt{idx + 1}"
+                    ckpt_name = f"pi_ckpt{idx + 1}.pth"
                     ckpt_path = os.path.join("models", ckpt_name)
                     self.agent.save_policy_net(ckpt_path)
                     self.checkpoints_saved[idx] = True
@@ -147,11 +146,19 @@ class OnPolicyTrainer:
                 recent_mean_return = np.mean(self.logger.episode_returns)
                 if recent_mean_return > self.best_mean_return:
                     self.best_mean_return = recent_mean_return
-                    best_path = os.path.join("models", "best_return_pi_ckpt")
+                    best_path = os.path.join("models", "best_return_pi_ckpt.pth")
                     self.agent.save_policy_net(best_path)
 
             # Clear buffers
             rollout_buffer.clear()
+
+        # Save the trained models
+        os.makedirs("models", exist_ok=True)
+        final_actor_path = os.path.join("models", "final_actor.pth")
+        final_critic_path = os.path.join("models", "final_critic.pth")
+        self.agent.save_policy_net(final_actor_path)
+        self.agent.save_value_net(final_critic_path)
+        print("Final models saved!")
 
         # Close progress bar
         self.pbar.close()
