@@ -2,7 +2,7 @@ from tqdm import tqdm
 import numpy as np
 import os
 from .buffers import RolloutBuffer
-from .utils import Logger
+from .utils import Logger, Visualizer
 
 
 class OnPolicyTrainer:
@@ -14,18 +14,25 @@ class OnPolicyTrainer:
         total_timesteps (int): Total training timesteps
         threshold_rollout_length (int): Minimum rollout length
         max_episode_len (int): Maximum episode length
-        device (str): Device to use ('cpu' or 'cuda')
         batch_size (int): Batch size for training
         batch_num (int): Number of batches (if None, use batch_size)
         verbose (bool): Whether to print logs
         num_checkpoints (int): How many intermediate checkpoints to save (saved at fractions i/(num_checkpoints+1))
     """
 
-    def __init__(self, environment, agent, total_timesteps=1_000_000,
-                 threshold_rollout_length=2048, max_episode_len=1000,
-                 batch_size=64,
-                 num_checkpoints=3,
-                 batch_num=None, verbose=True):
+    def __init__(
+        self,
+        environment,
+        agent,
+        total_timesteps=1_000_000,
+        threshold_rollout_length=2048,
+        max_episode_len=1024,
+        batch_size=64,
+        num_checkpoints=3,
+        batch_num=None,
+        verbose=True,
+        mini_ckpt_period=None,
+    ):
         self.env = environment
         self.agent = agent
         self.total_timesteps = total_timesteps
@@ -34,8 +41,15 @@ class OnPolicyTrainer:
         self.batch_size = batch_size
         self.batch_num = batch_num
 
-        # Logger
+        # Logger and Visualizer
         self.logger = Logger(verbose=verbose)
+        self.visualizer = Visualizer(self.logger)
+        # Mini‐checkpoint parameters
+        if mini_ckpt_period is not None:
+            self.mini_ckpt_period = mini_ckpt_period
+        else:
+            self.mini_ckpt_period = total_timesteps/1000
+        self._last_mini_ckpt = 0
 
         # Progress bar
         self.pbar = tqdm(total=total_timesteps, desc="Training Progress")
@@ -132,12 +146,16 @@ class OnPolicyTrainer:
             self.logger.total_rollouts += 1
             self.logger.print_log(self.total_timesteps, self.agent.clip_range)
 
+            # mini‐checkpoint plots
+            if self.logger.total_timesteps >= (self._last_mini_ckpt + self.mini_ckpt_period):
+                self.visualizer.plot_ckpt(self.logger.total_timesteps)
+                self._last_mini_ckpt += self.mini_ckpt_period
+
             # === checkpoint and best model saving ===
             # 1. Checkpoint saves at checkpoint milestones
             for idx, milestone in enumerate(self.checkpoint_timesteps):
                 if (not self.checkpoints_saved[idx]) and (self.logger.total_timesteps >= milestone):
-                    ckpt_name = f"pi_ckpt{idx + 1}.pth"
-                    ckpt_path = os.path.join("models", ckpt_name)
+                    ckpt_path = os.path.join("models", f"pi_ckpt{idx+1}.pth")
                     self.agent.save_policy_net(ckpt_path)
                     self.checkpoints_saved[idx] = True
 
@@ -159,6 +177,9 @@ class OnPolicyTrainer:
         self.agent.save_policy_net(final_actor_path)
         self.agent.save_value_net(final_critic_path)
         print("Final models saved!")
+
+        # final checkpoint plots
+        self.visualizer.plot_ckpt(self.logger.total_timesteps)
 
         # Close progress bar
         self.pbar.close()
