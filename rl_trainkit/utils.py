@@ -161,59 +161,121 @@ class Logger:
 
 
 class Visualizer:
-    """Visualization of training curves from a Logger."""
+    """Visualization of training curves from a Logger, with optional smoothing."""
 
-    def __init__(self, logger: Logger, output_dir: str = "./output"):
+    def __init__(
+        self,
+        logger: Logger,
+        output_dir: str = "./output",
+        smoothing_window: int = 20,
+    ):
+        """Initialize the Visualizer.
+
+        Args:
+            logger (Logger): The logger instance containing training data.
+            output_dir (str): Directory to save the generated plots.
+            smoothing_window (int): Window size for smoothing plots.
+        """
         self.logger = logger
         self.output_dir = output_dir
+        self.smoothing_window = smoothing_window
         os.makedirs(self.output_dir, exist_ok=True)
 
     def plot_ckpt(self, timestep: int):
-        """Generate & save all three plots at a checkpoint."""
+        """Generate and save all three plots at a given checkpoint timestep.
+
+        Args:
+            timestep (int): The current training timestep.
+        """
         self._plot_episode_returns(timestep)
         self._plot_success_rates(timestep)
         self._plot_rollout_returns(timestep)
 
+    def _smooth(self, data: np.ndarray) -> np.ndarray:
+        """Smooth 1D data using a moving average convolution.
+
+        Args:
+            data (np.ndarray): The raw data to smooth.
+
+        Returns:
+            np.ndarray: The smoothed data, same length as input.
+        """
+        kernel = np.ones(self.smoothing_window) / self.smoothing_window
+        # 'valid' gives only full-window points; pad to same length:
+        smooth = np.convolve(data, kernel, mode="valid")
+        pad_left = (len(data) - len(smooth)) // 2
+        pad_right = len(data) - len(smooth) - pad_left
+        return np.pad(smooth, (pad_left, pad_right), mode="edge")
+
     def _plot_episode_returns(self, timestep: int):
-        x = list(range(1, len(self.logger.all_episode_returns) + 1))
-        y = self.logger.all_episode_returns
+        """Plot raw and smoothed episode returns over time, and save the figure.
+
+        Args:
+            timestep (int): The current training timestep at the plotting moment.
+        """
+        raw = np.array(self.logger.all_episode_returns)
+        smooth = self._smooth(raw)
+        x = np.arange(1, len(raw) + 1)
+
         plt.figure()
-        plt.plot(x, y)
+        plt.plot(x, raw, color="C0", alpha=0.3, label="Raw")
+        plt.plot(x, smooth, color="C0", label=f"Smoothed (w={self.smoothing_window})")
         plt.xlabel("Episodes")
         plt.ylabel("Return")
-        plt.title(f"Episode Returns @ {timestep} ts")
+        plt.title(f"Episode Returns @ {timestep} timestep")
+        plt.legend()
         path = os.path.join(self.output_dir, f"episode_returns.png")
         plt.savefig(path)
         plt.close()
 
     def _plot_success_rates(self, timestep: int):
-        window = self.logger.recent_episodes_window
-        flags = self.logger.all_episode_success
-        rates = []
-        for i in range(len(flags)):
-            start = max(0, i - window + 1)
-            rates.append(np.mean(flags[start : i + 1]))
-        x = list(range(1, len(rates) + 1))
+        """Plot raw and smoothed success rates over episodes, and save the figure.
+
+        Args:
+            timestep (int): The current training timestep at the plotting moment.
+        """
+        flags = np.array(self.logger.all_episode_success, dtype=float)
+        # compute raw rolling success rate
+        raw_rate = np.array([
+            flags[max(0, i - self.logger.recent_episodes_window + 1) : i + 1].mean()
+            for i in range(len(flags))
+        ])
+        smooth_rate = self._smooth(raw_rate)
+        x = np.arange(1, len(raw_rate) + 1)
+
         plt.figure()
-        plt.plot(x, rates)
+        plt.plot(x, raw_rate, color="C1", alpha=0.3, label="Raw success rate")
+        plt.plot(x, smooth_rate, color="C1", label=f"Smoothed (w={self.smoothing_window})")
         plt.xlabel("Episodes")
         plt.ylabel("Success Rate")
-        plt.title(f"Success Rate (window={window}) @ {timestep} ts")
+        plt.title(f"Success Rate (window={self.logger.recent_episodes_window}) @ {timestep} timestep")
+        plt.legend()
         path = os.path.join(self.output_dir, f"success_rates.png")
         plt.savefig(path)
         plt.close()
 
     def _plot_rollout_returns(self, timestep: int):
-        x = self.logger.rollout_indices
-        y = self.logger.rollout_means
-        ci = self.logger.rollout_cis95
-        if not x:
+        """Plot rollout mean returns with 95% confidence intervals and save the figure.
+
+        Args:
+            timestep (int): The current training timestep at the plotting moment.
+        """
+        x = np.array(self.logger.rollout_indices)
+        y = np.array(self.logger.rollout_means)
+        ci = np.array(self.logger.rollout_cis95)
+        if x.size == 0:
             return
+
+        lower = y - ci
+        upper = y + ci
+
         plt.figure()
-        plt.errorbar(x, y, yerr=ci, fmt='o-')
+        plt.plot(x, y, marker='o', label="Mean Return")
+        plt.fill_between(x, lower, upper, alpha=0.2, label="±95% CI")
         plt.xlabel("Rollouts")
         plt.ylabel("Mean Return")
-        plt.title(f"Rollout Mean Returns ±95% CI @ {timestep} ts")
+        plt.title(f"Rollout Mean Returns ±95% CI @ {timestep} timestep")
+        plt.legend()
         path = os.path.join(self.output_dir, f"rollout_returns.png")
         plt.savefig(path)
         plt.close()
