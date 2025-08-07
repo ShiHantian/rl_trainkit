@@ -22,7 +22,6 @@ def main():
         actor_lr=3e-4,
         critic_lr=3e-4,
         update_epochs=10,
-        threshold_rollout_length=2048,
         device = "cuda" if torch.cuda.is_available() else "cpu"
     )
 

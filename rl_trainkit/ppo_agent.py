@@ -18,14 +18,13 @@ class PPOClip:
         actor_lr (float): Actor learning rate
         critic_lr (float): Critic learning rate
         update_epochs (int): Number of update epochs
-        threshold_rollout_length (int): Minimum rollout length
         device (str): Device to use ('cpu' or 'cuda')
 
     """
 
     def __init__(self, state_dim, action_dim, clip_range=0.2, max_kl=0.01,
                  gamma=0.99, gae_lambda=0.95, actor_lr=3e-4, critic_lr=3e-4,
-                 update_epochs=10, threshold_rollout_length=2048, device='cpu'):
+                 update_epochs=10, device='cpu'):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.clip_range = clip_range
@@ -33,7 +32,6 @@ class PPOClip:
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.update_epochs = update_epochs
-        self.threshold_rollout_length = threshold_rollout_length
         self.device = device
 
         # Networks
@@ -113,49 +111,52 @@ class PPOClip:
         """
         for epoch in range(self.update_epochs):
             for batch in rollout_buffer.get_batches():
-                # Move batch to device
-                states = batch['states'].to(self.device)
-                actions = batch['actions'].to(self.device)
-                old_log_probs = batch['log_probs'].to(self.device)
-                returns = batch['returns'].to(self.device)
-                advantages = batch['advantages'].to(self.device)
-                old_values = batch['values'].to(self.device)
+                self.update_with_batch(batch, logger=logger)
 
-                # Calculate current log probs and values
-                log_probs = self.actor.log_prob(states, actions)
-                values = self.critic(states)
+    def update_with_batch(self, batch, logger=None):
+        # Move batch to device
+        states = batch['states'].to(self.device)
+        actions = batch['actions'].to(self.device)
+        old_log_probs = batch['log_probs'].to(self.device)
+        returns = batch['returns'].to(self.device)
+        advantages = batch['advantages'].to(self.device)
+        old_values = batch['values'].to(self.device)
 
-                # Calculate ratio and clipped objective
-                ratio = torch.exp(log_probs - old_log_probs)
-                clipped_ratio = torch.clamp(ratio, 1 - self.clip_range, 1 + self.clip_range)
+        # Calculate current log probs and values
+        log_probs = self.actor.log_prob(states, actions)
+        values = self.critic(states)
 
-                # Actor loss
-                actor_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
+        # Calculate ratio and clipped objective
+        ratio = torch.exp(log_probs - old_log_probs)
+        clipped_ratio = torch.clamp(ratio, 1 - self.clip_range, 1 + self.clip_range)
 
-                # Critic loss (value function clipping)
-                value_pred_clipped = old_values + torch.clamp(
-                    values - old_values, -self.clip_range, self.clip_range
-                )
-                value_loss1 = (values - returns).pow(2)
-                value_loss2 = (value_pred_clipped - returns).pow(2)
-                critic_loss = 0.5 * torch.max(value_loss1, value_loss2).mean()
+        # Actor loss
+        actor_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
 
-                # Update actor
-                self.actor_optimizer.zero_grad()
-                actor_loss.backward()
-                self.actor_optimizer.step()
+        # Critic loss (value function clipping)
+        value_pred_clipped = old_values + torch.clamp(
+            values - old_values, -self.clip_range, self.clip_range
+        )
+        value_loss1 = (values - returns).pow(2)
+        value_loss2 = (value_pred_clipped - returns).pow(2)
+        critic_loss = 0.5 * torch.max(value_loss1, value_loss2).mean()
 
-                # Update critic
-                self.critic_optimizer.zero_grad()
-                critic_loss.backward()
-                self.critic_optimizer.step()
+        # Update actor
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
 
-                # Log statistics
-                if logger is not None:
-                    with torch.no_grad():
-                        approx_kl = (old_log_probs - log_probs).mean().item()
-                        clipped = (clipped_ratio != ratio).float().mean().item()
-                        logger.log_update(clipped, approx_kl)
+        # Update critic
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # Log statistics
+        if logger is not None:
+            with torch.no_grad():
+                approx_kl = (old_log_probs - log_probs).mean().item()
+                clipped = (clipped_ratio != ratio).float().mean().item()
+                logger.log_update(clipped, approx_kl)
 
     def save_policy_net(self, path):
         """Save policy network.
