@@ -12,28 +12,28 @@ class PPOClip:
         state_dim (int): State dimension
         action_dim (int): Action dimension
         clip_range (float): PPO clip range
-        value_clip_range (float): Value clip range
-        target_kl (float): Maximum KL divergence
+        max_kl (float): Maximum KL divergence
         gamma (float): Discount factor
         gae_lambda (float): GAE lambda parameter
         actor_lr (float): Actor learning rate
         critic_lr (float): Critic learning rate
         update_epochs (int): Number of update epochs
+        threshold_rollout_length (int): Minimum rollout length
         device (str): Device to use ('cpu' or 'cuda')
 
     """
 
-    def __init__(self, state_dim, action_dim, clip_range=0.2, value_clip_range=0.2, target_kl=0.01,
+    def __init__(self, state_dim, action_dim, clip_range=0.2, max_kl=0.01,
                  gamma=0.99, gae_lambda=0.95, actor_lr=3e-4, critic_lr=3e-4,
-                 update_epochs=10, device='cpu'):
+                 update_epochs=10, threshold_rollout_length=2048, device='cpu'):
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.clip_range = clip_range
-        self.value_clip_range = value_clip_range
-        self.target_kl = target_kl
+        self.max_kl = max_kl
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.update_epochs = update_epochs
+        self.threshold_rollout_length = threshold_rollout_length
         self.device = device
 
         # Networks
@@ -103,8 +103,8 @@ class PPOClip:
 
         return trajectory
 
-    def update_with_rollout(self, rollout_buffer, logger=None):
-        """Update actor and critic networks with the rollout buffer.
+    def update(self, rollout_buffer, logger=None):
+        """Update actor and critic networks.
 
         Args:
             rollout_buffer (RolloutBuffer): Rollout buffer with data
@@ -113,66 +113,49 @@ class PPOClip:
         """
         for epoch in range(self.update_epochs):
             for batch in rollout_buffer.get_batches():
-                early_stop = self.update_with_batch(batch, logger)
-                if early_stop:
-                    return
+                # Move batch to device
+                states = batch['states'].to(self.device)
+                actions = batch['actions'].to(self.device)
+                old_log_probs = batch['log_probs'].to(self.device)
+                returns = batch['returns'].to(self.device)
+                advantages = batch['advantages'].to(self.device)
+                old_values = batch['values'].to(self.device)
 
-    def update_with_batch(self, batch, logger=None):
-        """Update actor and critic networks with the rollout buffer.
+                # Calculate current log probs and values
+                log_probs = self.actor.log_prob(states, actions)
+                values = self.critic(states)
 
-        Args:
-            batch (dict): One batch of data from the shuffled rollout buffer
-            logger (Logger): Logger for tracking statistics
+                # Calculate ratio and clipped objective
+                ratio = torch.exp(log_probs - old_log_probs)
+                clipped_ratio = torch.clamp(ratio, 1 - self.clip_range, 1 + self.clip_range)
 
-        """
-        # Move the batch to device
-        states = batch['states'].to(self.device)
-        actions = batch['actions'].to(self.device)
-        old_log_probs = batch['log_probs'].to(self.device)
-        returns = batch['returns'].to(self.device)
-        advantages = batch['advantages'].to(self.device)
-        old_values = batch['values'].to(self.device)
+                # Actor loss
+                actor_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
 
-        # Calculate current log probs and values
-        log_probs = self.actor.log_prob(states, actions)
-        values = self.critic(states)
+                # Critic loss (value function clipping)
+                value_pred_clipped = old_values + torch.clamp(
+                    values - old_values, -self.clip_range, self.clip_range
+                )
+                value_loss1 = (values - returns).pow(2)
+                value_loss2 = (value_pred_clipped - returns).pow(2)
+                critic_loss = 0.5 * torch.max(value_loss1, value_loss2).mean()
 
-        # Calculate ratio and clipped objective
-        ratio = torch.exp(log_probs - old_log_probs)
-        clipped_ratio = torch.clamp(ratio, 1 - self.clip_range, 1 + self.clip_range)
+                # Update actor
+                self.actor_optimizer.zero_grad()
+                actor_loss.backward()
+                self.actor_optimizer.step()
 
-        # Actor loss
-        actor_loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean()
+                # Update critic
+                self.critic_optimizer.zero_grad()
+                critic_loss.backward()
+                self.critic_optimizer.step()
 
-        # Critic loss (clipped value objective)
-        value_pred_clipped = old_values + \
-            torch.clamp(values - old_values, -self.value_clip_range, self.value_clip_range)
-        value_loss_unclipped = (values - returns).pow(2)
-        value_loss_clipped = (value_pred_clipped - returns).pow(2)
-        critic_loss = 0.5 * torch.max(value_loss_unclipped, value_loss_clipped).mean()
-
-        # Update actor
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
-
-        # Update critic
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
-
-        # Log statistics
-        with torch.no_grad():
-            approx_kl = (old_log_probs - log_probs).mean().item()
-            clipped = (clipped_ratio != ratio).float().mean().item()
-            logger.log_update(clipped, approx_kl)
-
-        # Check for early stop for too big KL divergence
-        early_stop = False
-        if approx_kl > 1.5 * self.target_kl:
-            early_stop = True
-
-        return early_stop
+                # Log statistics
+                if logger is not None:
+                    with torch.no_grad():
+                        approx_kl = (old_log_probs - log_probs).mean().item()
+                        clipped = (clipped_ratio != ratio).float().mean().item()
+                        logger.log_update(clipped, approx_kl)
 
     def save_policy_net(self, path):
         """Save policy network.

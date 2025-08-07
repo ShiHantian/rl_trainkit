@@ -17,12 +17,12 @@ def main():
         state_dim=state_dim,
         action_dim=action_dim,
         clip_range=0.2,
-        value_clip_range=0.1,
         gamma=0.99,
         gae_lambda=0.95,
         actor_lr=3e-4,
         critic_lr=3e-4,
         update_epochs=10,
+        threshold_rollout_length=2048,
         device = "cuda" if torch.cuda.is_available() else "cpu"
     )
 
@@ -34,13 +34,17 @@ def main():
         threshold_rollout_length=2048,
         max_episode_len=200,
         batch_size=64,
-        num_checkpoints=4,
-        mini_ckpt_period=4096,
         verbose=True
     )
 
     # Train the agent
     trainer.train()
+
+    # Save the trained models
+    os.makedirs("models", exist_ok=True)
+    agent.save_policy_net("models/final_actor.pth")
+    agent.save_value_net("models/final_critic.pth")
+    print("Models saved!")
 
     env.close()
 

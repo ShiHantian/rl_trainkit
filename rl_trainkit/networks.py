@@ -40,11 +40,9 @@ class Actor(nn.Module):
 
     """
 
-    def __init__(self, state_dim, action_dim, hidden_dims=None,
+    def __init__(self, state_dim, action_dim, hidden_dims=[64, 64],
                  log_std_min=-20, log_std_max=2):
         super().__init__()
-        if hidden_dims is None:
-            hidden_dims = [64, 64]
         self.mlp = MLP(state_dim, hidden_dims, action_dim)
         self.log_std = nn.Parameter(torch.zeros(action_dim))
         self.log_std_min = log_std_min
