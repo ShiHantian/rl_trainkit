@@ -68,6 +68,80 @@ class OnPolicyTrainer:
         self.best_mean_return = -float("inf")
 
 
+    def collect_one_rollout(self, state, episode_length, episode_return):
+        """Collect one rollout.
+
+        Args:
+            state: Current state
+            episode_length (int): Current episode length
+            episode_return (float): Current episode return
+
+        Returns:
+            tuple: (rollout_buffer, episode_length, episode_return)
+        """
+        # Create rollout buffer
+        rollout_buffer = RolloutBuffer(
+            self.threshold_rollout_length,
+            self.batch_size,
+            self.batch_num
+        )
+
+        # Collect rollout
+        while len(rollout_buffer) < self.threshold_rollout_length:
+            # Select action
+            action, value, log_prob = self.agent.select_action(state)
+
+            # Step environment
+            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            done = terminated or truncated
+
+            # Store transition
+            self.agent.current_trajectory.push_one_step(
+                state, action, reward, next_state, done, value, log_prob
+            )
+
+            # Log step
+            self.logger.log_step(reward)
+
+            # Update episode tracking
+            episode_length += 1
+            episode_return += reward
+
+            # Check if episode ended
+            if done or episode_length >= self.max_episode_len:
+                # Finish trajectory
+                if done:
+                    trajectory = self.agent.finish_trajectory(None)
+                else:
+                    trajectory = self.agent.finish_trajectory(next_state)
+
+                # Add to roll out buffer
+                rollout_buffer.concat(trajectory)
+
+                # Log episode
+                self.logger.log_episode(episode_length, episode_return, terminated)
+
+                # Reset episode
+                state, _ = self.env.reset()
+                episode_length = 0
+                episode_return = 0
+            else:
+                state = next_state
+
+            # Update progress bar
+            self.pbar.update(1)
+
+            # Check if we've reached total timesteps
+            if self.logger.total_timesteps >= self.total_timesteps:
+                break
+
+        # If current trajectory has data, finish it
+        if len(self.agent.current_trajectory) > 0:
+            trajectory = self.agent.finish_trajectory(state)
+            rollout_buffer.concat(trajectory)
+
+        return rollout_buffer, episode_length, episode_return
+
     def train(self):
         """Train the agent.
 
@@ -78,66 +152,8 @@ class OnPolicyTrainer:
         episode_return = 0
 
         while self.logger.total_timesteps < self.total_timesteps:
-            # Create rollout buffer
-            rollout_buffer = RolloutBuffer(
-                self.threshold_rollout_length,
-                self.batch_size,
-                self.batch_num
-            )
-
-            # Collect rollout
-            while len(rollout_buffer) < self.threshold_rollout_length:
-                # Select action
-                action, value, log_prob = self.agent.select_action(state)
-
-                # Step environment
-                next_state, reward, terminated, truncated, _ = self.env.step(action)
-                done = terminated or truncated
-
-                # Store transition
-                self.agent.current_trajectory.push_one_step(
-                    state, action, reward, next_state, done, value, log_prob
-                )
-
-                # Log step
-                self.logger.log_step(reward)
-
-                # Update episode tracking
-                episode_length += 1
-                episode_return += reward
-
-                # Check if episode ended
-                if done or episode_length >= self.max_episode_len:
-                    # Finish trajectory
-                    if done:
-                        trajectory = self.agent.finish_trajectory(None)
-                    else:
-                        trajectory = self.agent.finish_trajectory(next_state)
-
-                    # Add to roll out buffer
-                    rollout_buffer.concat(trajectory)
-
-                    # Log episode
-                    self.logger.log_episode(episode_length, episode_return, terminated)
-
-                    # Reset episode
-                    state, _ = self.env.reset()
-                    episode_length = 0
-                    episode_return = 0
-                else:
-                    state = next_state
-
-                # Update progress bar
-                self.pbar.update(1)
-
-                # Check if we've reached total timesteps
-                if self.logger.total_timesteps >= self.total_timesteps:
-                    break
-
-            # If current trajectory has data, finish it
-            if len(self.agent.current_trajectory) > 0:
-                trajectory = self.agent.finish_trajectory(state)
-                rollout_buffer.concat(trajectory)
+            # Collect one rollout
+            rollout_buffer, episode_length, episode_return = self.collect_one_rollout(state, episode_length, episode_return)
 
             # Update networks
             self.agent.update(rollout_buffer, self.logger)
