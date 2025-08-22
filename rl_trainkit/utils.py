@@ -30,9 +30,7 @@ class Logger:
         # Rollout tracking (per‐update, cleared after print)
         self.rollout_episode_lengths = []
         self.rollout_episode_returns = []
-        self.rollout_rewards = []
-        self.rollout_clipped_ratios = []
-        self.rollout_kls = []
+        self.rollout_length = 0
 
         # History of rollout‐level statistics
         self.rollout_indices = []
@@ -74,14 +72,13 @@ class Logger:
         self.rollout_episode_lengths.append(length)
         self.rollout_episode_returns.append(return_val)
 
-    def log_step(self, reward):
-        """Log step statistics."""
-        self.rollout_rewards.append(reward)
+    def log_rollout(self, rollout_length):
+        """Log rollout statistics.
 
-    def log_update(self, clipped_ratio, kl):
-        """Log update statistics."""
-        self.rollout_clipped_ratios.append(clipped_ratio)
-        self.rollout_kls.append(kl)
+        Args:
+            rollout_length (int): number of timesteps in this rollout
+            """
+        self.rollout_length = rollout_length
 
     def print_log(self, total_timesteps_target, clip_range):
         """Print training log and snapshot rollout stats for plotting."""
@@ -98,10 +95,7 @@ class Logger:
         # Rollout statistics
         mean_ep_len = np.mean(self.rollout_episode_lengths) if self.rollout_episode_lengths else 0
         mean_ep_return = np.mean(self.rollout_episode_returns) if self.rollout_episode_returns else 0
-        mean_reward = np.mean(self.rollout_rewards) if self.rollout_rewards else 0
-        mean_clipped_ratio = np.mean(self.rollout_clipped_ratios) if self.rollout_clipped_ratios else 0
-        approx_kl = np.mean(self.rollout_kls) if self.rollout_kls else 0
-        rollout_len = len(self.rollout_rewards)
+        rollout_len = self.rollout_length
 
         # Recent episodes statistics
         recent_mean_ep_len = np.mean(self.episode_lengths) if self.episode_lengths else 0
@@ -114,9 +108,6 @@ class Logger:
         print("-" * self.separator_line_length)
         print(f"  mean_ep_len:        {mean_ep_len:.2f}")
         print(f"  mean_ep_return:     {mean_ep_return:.2f}")
-        print(f"  mean_reward:        {mean_reward:.4f}")
-        print(f"  mean_clipped_ratio: {mean_clipped_ratio:.4f}")
-        print(f"  approx_kl:          {approx_kl:.6f}")
         print(f"  rollout_len:        {rollout_len}")
         print(f"  time_elapsed:       {time_elapsed:.2f}s")
 
@@ -155,9 +146,6 @@ class Logger:
     def _clear_rollout(self):
         self.rollout_episode_lengths.clear()
         self.rollout_episode_returns.clear()
-        self.rollout_rewards.clear()
-        self.rollout_clipped_ratios.clear()
-        self.rollout_kls.clear()
 
 
 class Visualizer:

@@ -85,6 +85,7 @@ class OnPolicyTrainer:
         state, _ = self.env.reset()
         episode_length = 0
         episode_return = 0
+        rollout_length = 0
 
         # Collect rollout
         while len(rollout_buffer) < self.threshold_rollout_length:
@@ -99,9 +100,6 @@ class OnPolicyTrainer:
             self.agent.current_trajectory.push_one_step(
                 state, action, reward, next_state, done, value, log_prob
             )
-
-            # Log step
-            self.logger.log_step(reward)
 
             # Update episode tracking
             episode_length += 1
@@ -138,11 +136,14 @@ class OnPolicyTrainer:
             if self.logger.total_timesteps >= self.total_timesteps:
                 break
 
+            rollout_length += 1
+
         # If current trajectory has data, finish it
         if len(self.agent.current_trajectory) > 0:
             trajectory = self.agent.finish_trajectory(state)
             rollout_buffer.concat(trajectory)
 
+        self.logger.log_rollout(rollout_length)
         return rollout_buffer
 
     def train(self):
