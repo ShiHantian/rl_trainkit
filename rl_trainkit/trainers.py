@@ -132,16 +132,7 @@ class OnPolicyTrainer:
             # Update progress bar
             self.pbar.update(1)
 
-            # Check if we've reached total timesteps
-            if self.logger.total_timesteps >= self.total_timesteps:
-                break
-
             rollout_length += 1
-
-        # If current trajectory has data, finish it
-        if len(self.agent.current_trajectory) > 0:
-            trajectory = self.agent.finish_trajectory(state)
-            rollout_buffer.concat(trajectory)
 
         self.logger.log_rollout(rollout_length)
         return rollout_buffer
