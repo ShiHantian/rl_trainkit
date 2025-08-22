@@ -72,7 +72,7 @@ class OnPolicyTrainer:
         """Collect one rollout.
 
         Returns:
-            rollout_buffer (R: rollout_buffer
+            rollout_buffer (Rollout_buffer): one rollout of collected data
         """
         # Create rollout buffer
         rollout_buffer = RolloutBuffer(
