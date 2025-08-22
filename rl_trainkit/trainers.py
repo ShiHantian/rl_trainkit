@@ -68,16 +68,11 @@ class OnPolicyTrainer:
         self.best_mean_return = -float("inf")
 
 
-    def collect_one_rollout(self, state, episode_length, episode_return):
+    def collect_one_rollout(self):
         """Collect one rollout.
 
-        Args:
-            state: Current state
-            episode_length (int): Current episode length
-            episode_return (float): Current episode return
-
         Returns:
-            tuple: (rollout_buffer, episode_length, episode_return)
+            rollout_buffer (R: rollout_buffer
         """
         # Create rollout buffer
         rollout_buffer = RolloutBuffer(
@@ -85,6 +80,11 @@ class OnPolicyTrainer:
             self.batch_size,
             self.batch_num
         )
+
+        # Initialize
+        state, _ = self.env.reset()
+        episode_length = 0
+        episode_return = 0
 
         # Collect rollout
         while len(rollout_buffer) < self.threshold_rollout_length:
@@ -115,11 +115,14 @@ class OnPolicyTrainer:
                 else:
                     trajectory = self.agent.finish_trajectory(next_state)
 
-                # Add to roll out buffer
+                # Add to rollout_buffer
                 rollout_buffer.concat(trajectory)
 
                 # Log episode
                 self.logger.log_episode(episode_length, episode_return, terminated)
+
+                # Clear the trajectory buffer
+                self.agent.current_trajectory.clear()
 
                 # Reset episode
                 state, _ = self.env.reset()
@@ -140,20 +143,16 @@ class OnPolicyTrainer:
             trajectory = self.agent.finish_trajectory(state)
             rollout_buffer.concat(trajectory)
 
-        return rollout_buffer, episode_length, episode_return
+        return rollout_buffer
 
     def train(self):
         """Train the agent.
 
         """
-        # Initialize
-        state, _ = self.env.reset()
-        episode_length = 0
-        episode_return = 0
 
         while self.logger.total_timesteps < self.total_timesteps:
             # Collect one rollout
-            rollout_buffer, episode_length, episode_return = self.collect_one_rollout(state, episode_length, episode_return)
+            rollout_buffer = self.collect_one_rollout()
 
             # Update networks
             self.agent.update(rollout_buffer, self.logger)
@@ -162,6 +161,7 @@ class OnPolicyTrainer:
             self.logger.total_rollouts += 1
             self.logger.print_log(self.total_timesteps, self.agent.clip_range)
 
+            # === mini-checkpoint and visualizing ===
             # mini‐checkpoint plots
             if self.logger.total_timesteps >= (self._last_mini_ckpt + self.mini_ckpt_period):
                 self.visualizer.plot_ckpt(self.logger.total_timesteps)
@@ -186,6 +186,7 @@ class OnPolicyTrainer:
             # Clear buffers
             rollout_buffer.clear()
 
+        # === Total timesteps reached, training completed ===
         # Save the trained models
         os.makedirs("models", exist_ok=True)
         final_actor_path = os.path.join("models", "final_actor.pth")
