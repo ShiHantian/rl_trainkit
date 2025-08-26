@@ -188,6 +188,8 @@ class Visualizer:
         Returns:
             np.ndarray: The smoothed data, same length as input.
         """
+        if len(data) < self.smoothing_window:
+            return data
         kernel = np.ones(self.smoothing_window) / self.smoothing_window
         # 'valid' gives only full-window points; pad to same length:
         smooth = np.convolve(data, kernel, mode="valid")
