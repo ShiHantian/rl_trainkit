@@ -210,7 +210,7 @@ __marimo__/
 models/
 temp**
 output/
-**.pdf
-.marscode/
-.trae
 .vscode/
+.marscode/
+.trae/
+**.pdf

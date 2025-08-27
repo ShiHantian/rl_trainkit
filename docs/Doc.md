@@ -43,10 +43,6 @@ for epoch in num_update_epochs:
     <img src="assets/base_buffer_dimension.png" align="center" alt="base_buffer_dimension" width="60%"/>
 </p>
 
-<p align="center">
-    <img src="assets/rollout_buffer_structure.png" align="center" alt="rollout_buffer_structure" width="90%"/>
-</p>
-
 ### Training pipline
 
 <p align="center">

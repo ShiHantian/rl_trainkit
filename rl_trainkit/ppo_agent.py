@@ -246,13 +246,6 @@ class PPOClip:
             critic_loss.backward()
             self.critic_optimizer.step()
 
-            # Log statistics
-            if logger is not None:
-                with torch.no_grad():
-                    approx_kl = (old_log_probs - log_probs).mean().item()
-                    clipped = (clipped_ratio != ratio).float().mean().item()
-                    logger.log_update(clipped, approx_kl)
-
     def save_policy_net(self, path):
         """Save policy network.
 
