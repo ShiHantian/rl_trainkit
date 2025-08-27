@@ -209,3 +209,8 @@ __marimo__/
 # My project
 models/
 temp**
+output/
+**.pdf
+.marscode/
+.trae
+.vscode/
