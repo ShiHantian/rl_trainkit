@@ -26,10 +26,8 @@ Training script example: refer to [train_example_Pendulum.py](train_example_Pend
 
 ## TODO
 
-- [ ] Add support for a shared feature extraction network for actor-critic.
-- [ ] Add thread management to improve the efficiency of sampling, data processing, and network updates; introduce support for callback functions.
-- [ ] Add data visualization scripts (similar to TensorBoard) for monitoring training metrics, losses, rewards, etc.
-- [ ] Expand documentation: Training workflow
+- [ ] Add feature extraction network for actor-critic network.
+- [ ] Add support A3C algorithm
 - [ ] Add support for other RL algorithms.
 
 ## References
